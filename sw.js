@@ -1,5 +1,5 @@
 // Service Worker Voicebox Lite - cache-first agar jalan offline
-const CACHE = 'voicebox-lite-v1';
+const CACHE = 'voicebox-lite-v2';
 const ASSETS = [
   './',
   './index.html',

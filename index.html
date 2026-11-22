@@ -67,7 +67,9 @@ input[type=range]{width:100%;padding:0;accent-color:var(--ac)}
     <div class="row">
       <button class="pri grow" onclick="playAll()">▶ Putar semua</button>
       <button onclick="stopAll()">■ Stop</button>
+      <button id="mp3b" onclick="exportMp3()">⬇ MP3</button>
     </div>
+    <div class="note" id="mp3s" style="margin-top:6px"></div>
     <div class="wave" id="wave" style="margin-top:8px"></div>
     <div id="clips"></div>
     <div class="note" id="empty">Belum ada klip. Tambahkan teks di atas.</div>
@@ -76,11 +78,16 @@ input[type=range]{width:100%;padding:0;accent-color:var(--ac)}
 
 <section id="p2" class="hide">
   <div class="card">
+    <b>Suara Indonesia di perangkat</b>
+    <div class="note" style="margin:4px 0 8px">Jenis kelamin ditebak dari nama suara, jadi tekan ▶ untuk memastikan.</div>
+    <div id="idlist"></div>
+  </div>
+  <div class="card">
     <b>Kloning / profil suara baru</b>
     <label>Nama profil</label>
     <input type="text" id="pn" placeholder="Contoh: Narator Santai">
     <label>Suara dasar (dari perangkat)</label>
-    <select id="pv"></select>
+    <div class="row"><select id="pv" class="grow"></select><button class="sm" onclick="testVoice()">▶ Tes</button></div>
     <label>Kecepatan: <span id="rv">1.0</span></label>
     <input type="range" id="pr" min="0.5" max="1.8" step="0.1" value="1" oninput="rv.textContent=this.value">
     <label>Nada: <span id="pvv">1.0</span></label>
@@ -91,7 +98,7 @@ input[type=range]{width:100%;padding:0;accent-color:var(--ac)}
       <input type="file" id="pf" accept="audio/*" class="grow" onchange="loadFile(this)">
     </div>
     <audio id="pa" controls class="hide" style="width:100%;margin-top:8px"></audio>
-    <div class="note" style="margin-top:8px">Catatan: kloning suara sungguhan butuh model AI lokal (mis. aplikasi Voicebox asli). Di browser, profil ini memakai suara bawaan perangkat dengan preset kecepatan &amp; nada, dan sampelmu disimpan sebagai referensi.</div>
+    <div class="note" style="margin-top:8px">Penting: sampel suara <b>belum dipakai untuk meniru suaramu</b>. Aplikasi ini hanya memakai suara TTS bawaan HP (diatur lewat kecepatan &amp; nada). Meniru suara sungguhan butuh model AI khusus; sampel di sini hanya disimpan sebagai referensi.</div>
     <button class="pri" style="margin-top:10px;width:100%" onclick="saveProf()">Simpan profil</button>
   </div>
   <div class="card"><b>Profil tersimpan</b><div id="plist"></div></div>
@@ -106,9 +113,33 @@ function load(){try{clips=JSON.parse(localStorage.getItem('vb_clips')||'[]');pro
  if(!profs.length)profs=[{id:'def',name:'Default',voice:'',rate:1,pitch:1,sample:null}]}
 function save(){try{localStorage.setItem('vb_clips',JSON.stringify(clips));localStorage.setItem('vb_profs',JSON.stringify(profs))}catch(e){}}
 function tab(n){$('p1').classList.toggle('hide',n!=1);$('p2').classList.toggle('hide',n!=2);$('t1').className=n==1?'on':'';$('t2').className=n==2?'on':''}
+var idv=[],seeded=false;
+function gender(v){var n=(v.name||'').toLowerCase();
+ if(/female|woman|perempuan|wanita/.test(n)||/x-id[ac]-/.test(n))return 'f';
+ if(/\bmale\b|\bman\b|pria|laki/.test(n)||/x-id[bd]-/.test(n))return 'm';return '?'}
+function gl(g){return g=='f'?'♀ Perempuan':g=='m'?'♂ Laki-laki':'Suara Indonesia'}
+function isId(v){return /^id([-_]|$)/i.test(v.lang||'')||/^in([-_]|$)/i.test(v.lang||'')}
 function getVoices(){voices=speechSynthesis.getVoices();
+ idv=voices.filter(isId);var rest=voices.filter(function(v){return !isId(v)});
+ function opt(v,lab){return '<option value="'+v.name+'">'+(lab?lab+' · ':'')+v.name+' ('+v.lang+')</option>'}
  var h='<option value="">Suara default</option>';
- voices.forEach(function(v){h+='<option value="'+v.name+'">'+v.name+' ('+v.lang+')</option>'});$('pv').innerHTML=h}
+ if(idv.length)h+='<optgroup label="Bahasa Indonesia">'+idv.map(function(v){return opt(v,gl(gender(v)))}).join('')+'</optgroup>';
+ if(rest.length)h+='<optgroup label="Bahasa lain">'+rest.map(function(v){return opt(v)}).join('')+'</optgroup>';
+ $('pv').innerHTML=h;
+ $('idlist').innerHTML=idv.length?idv.map(function(v,i){return '<div class="clip row"><div class="grow"><b>'+gl(gender(v))+'</b><div class="note">'+esc(v.name)+' · '+v.lang+'</div></div>'
+  +'<button class="sm" onclick="testIdx('+i+')">▶</button><button class="sm" onclick="useIdx('+i+')">+ Profil</button></div>'}).join('')
+  :'<div class="note">Belum ada suara Indonesia terdeteksi. Buka Pengaturan HP → Text-to-speech → Google → Bahasa, lalu unduh Bahasa Indonesia.</div>';
+ if(voices.length)seed()}
+function sayTest(v,rate,pitch){speechSynthesis.cancel();var u=new SpeechSynthesisUtterance('Halo, ini contoh suara saya untuk narasi.');
+ if(v){u.voice=v;u.lang=v.lang}else u.lang='id-ID';u.rate=rate||1;u.pitch=pitch||1;speechSynthesis.speak(u)}
+function testIdx(i){sayTest(idv[i],1,1)}
+function testVoice(){var v=voices.find(function(x){return x.name==$('pv').value});sayTest(v,+$('pr').value,+$('pp').value)}
+function useIdx(i){var v=idv[i],g=gender(v);profs.push({id:'p'+Date.now(),name:gl(g)+' '+(i+1),voice:v.name,rate:1,pitch:1,sample:null});render();alert('Profil ditambahkan. Pilih di tab Timeline.')}
+function seed(){if(seeded)return;seeded=true;try{if(localStorage.getItem('vb_seeded'))return}catch(e){}
+ var f=idv.find(function(v){return gender(v)=='f'}),m=idv.find(function(v){return gender(v)=='m'}),any=idv[0];
+ profs.push({id:'pf'+Date.now(),name:'Perempuan Indonesia',voice:(f||any||{}).name||'',rate:1,pitch:f?1:1.25,sample:null});
+ profs.push({id:'pm'+Date.now(),name:'Laki-laki Indonesia',voice:(m||any||{}).name||'',rate:1,pitch:m?1:0.75,sample:null});
+ try{localStorage.setItem('vb_seeded','1')}catch(e){}render()}
 function esc(s){return s.replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})}
 function pf(id){return profs.find(function(p){return p.id==id})||profs[0]}
 function est(c){return Math.max(1,c.text.length/(14*pf(c.prof).rate))}
@@ -148,8 +179,47 @@ function setSample(b){var r=new FileReader();r.onload=function(){sample=r.result
 function saveProf(){var n=$('pn').value.trim();if(!n){alert('Isi nama profil dulu.');return}
  profs.push({id:'p'+Date.now(),name:n,voice:$('pv').value,rate:+$('pr').value,pitch:+$('pp').value,sample:sample&&sample.length<400000?sample:null});
  $('pn').value='';sample=null;$('pa').classList.add('hide');render();tab(1)}
+
+var TF=null;try{if(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform())TF=Capacitor.registerPlugin('TtsFile')}catch(e){}
+function loadLame(){return new Promise(function(res,rej){if(window.lamejs)return res();
+ var urls=['lame.min.js','https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js'],i=0;
+ (function t(){if(i>=urls.length)return rej(new Error('Library MP3 (lamejs) tidak bisa dimuat'));
+  var el=document.createElement('script');el.src=urls[i++];el.onload=function(){window.lamejs?res():t()};el.onerror=t;document.head.appendChild(el)})()})}
+function b64ToBuf(b){var bin=atob(b),u=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u.buffer}
+function splitText(t){var parts=t.match(/[^.!?\n]+[.!?]*\s*/g)||[t],out=[],cur='';
+ parts.forEach(function(x){if((cur+x).length>3000&&cur){out.push(cur);cur=''}cur+=x});if(cur.trim())out.push(cur);return out}
+function blobToB64(b){return new Promise(function(res){var r=new FileReader();r.onload=function(){res(r.result.split(',')[1])};r.readAsDataURL(b)})}
+function tick(){return new Promise(function(r){setTimeout(r,0)})}
+async function exportMp3(){
+ if(!clips.length){alert('Belum ada klip. Tambahkan teks dulu.');return}
+ if(!TF){alert('Unduh MP3 hanya tersedia di aplikasi APK (butuh mesin TTS Android). Di browser, suara tidak bisa direkam ke file.');return}
+ var btn=$('mp3b'),st=$('mp3s');btn.disabled=true;stopAll();
+ try{
+  await loadLame();
+  var SR=44100,ctx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:SR}),pcm=[],total=0;
+  var gap=new Float32Array(Math.round(SR*0.25));
+  for(var i=0;i<clips.length;i++){
+   var c=clips[i],p=pf(c.prof),v=voices.find(function(x){return x.name==p.voice}),lang=v?v.lang:'id-ID',pieces=splitText(c.text);
+   for(var j=0;j<pieces.length;j++){
+    st.textContent='Membuat suara klip '+(i+1)+'/'+clips.length+'…';
+    var r=await TF.synth({text:pieces[j],voice:p.voice||'',lang:lang,rate:p.rate,pitch:p.pitch});
+    var ab=await ctx.decodeAudioData(b64ToBuf(r.data)),ch=ab.getChannelData(0);
+    pcm.push(ch);total+=ch.length}
+   pcm.push(gap);total+=gap.length}
+  var all=new Int16Array(total),o=0;
+  pcm.forEach(function(a){for(var k=0;k<a.length;k++){var x=Math.max(-1,Math.min(1,a[k]));all[o++]=x<0?x*32768:x*32767}});
+  var enc=new lamejs.Mp3Encoder(1,SR,128),out=[],B=1152;
+  for(var n=0;n<all.length;n+=B){var b=enc.encodeBuffer(all.subarray(n,n+B));if(b.length)out.push(new Uint8Array(b));
+   if((n/B)%200==0){st.textContent='Mengonversi ke MP3… '+Math.round(n/all.length*100)+'%';await tick()}}
+  var f=enc.flush();if(f.length)out.push(new Uint8Array(f));
+  var b64=await blobToB64(new Blob(out,{type:'audio/mpeg'}));
+  var saved=await TF.saveFile({data:b64,filename:'voicebox-'+Date.now()+'.mp3',mime:'audio/mpeg'});
+  st.textContent='✓ MP3 tersimpan: '+saved.path;
+  ctx.close&&ctx.close()
+ }catch(e){st.textContent='Gagal: '+(e&&e.message?e.message:e)}
+ btn.disabled=false}
 (function(){var w=$('wave');for(var i=0;i<40;i++)w.appendChild(document.createElement('i'));
- load();render();if('speechSynthesis' in window){getVoices();speechSynthesis.onvoiceschanged=getVoices}})();
+ load();render();if('speechSynthesis' in window){getVoices();speechSynthesis.onvoiceschanged=getVoices;setTimeout(seed,2500)}})();
 </script>
 <script>
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});}
