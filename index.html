@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Voicebox Lite</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#14110f">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{--bg:#14110f;--card:#1e1a17;--line:#2f2924;--tx:#f3ece6;--mut:#9a8f86;--ac:#e07a54;--gold:#e8b44a;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#faf6f2;--card:#fff;--line:#e6ddd4;--tx:#2a221c;--mut:#7d7167;--ac:#c85f38;--gold:#b8861f;color-scheme:light}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;max-width:720px;margin-inline:auto;padding:16px}
+h1{font-size:20px;margin:0}h1 span{color:var(--ac)}
+.sub{color:var(--mut);font-size:12px;margin:2px 0 14px}
+.tabs{display:flex;gap:6px;margin-bottom:14px}
+.tabs button{flex:1}
+button,select,textarea,input{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+button{cursor:pointer}button.on,button.pri{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:600}
+button.sm{padding:4px 9px;font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+label{display:block;font-size:12px;color:var(--mut);margin:10px 0 4px}
+textarea,input[type=text],select{width:100%}
+textarea{min-height:90px;resize:vertical}
+input[type=range]{width:100%;padding:0;accent-color:var(--ac)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grow{flex:1}
+.hide{display:none}
+.tl{display:flex;gap:3px;height:34px;margin:8px 0;overflow-x:auto}
+.blk{min-width:18px;border-radius:6px;background:var(--line);border:1px solid var(--gold);opacity:.8;cursor:pointer;font-size:10px;padding:2px 4px;overflow:hidden;white-space:nowrap}
+.blk.act{background:var(--ac);opacity:1;color:#fff}
+.clip{border-top:1px solid var(--line);padding:10px 0}
+.clip:first-child{border:0}
+.clip p{margin:4px 0;white-space:pre-wrap}
+.tag{font-size:11px;color:var(--gold)}
+.note{font-size:12px;color:var(--mut)}
+.wave{display:flex;align-items:center;gap:2px;height:36px}
+.wave i{width:3px;background:var(--ac);border-radius:2px;height:20%;transition:height .1s}
+.rec{color:#e5534b}
+.credit{text-align:center;font-size:10px;letter-spacing:.08em;color:var(--mut);margin:18px 0 6px}
+</style>
+</head>
+<body>
+<h1>Voice<span>box</span> Lite</h1>
+<div class="sub">Voice over gratis · local first · tanpa langganan · jalan di browser</div>
+
+<div class="tabs">
+  <button id="t1" class="on" onclick="tab(1)">Timeline</button>
+  <button id="t2" onclick="tab(2)">Suara</button>
+</div>
+
+<section id="p1">
+  <div class="card">
+    <label>Teks narasi</label>
+    <textarea id="txt" placeholder="Tulis narasi / dialog podcast di sini…"></textarea>
+    <div class="row" style="margin-top:8px">
+      <select id="prof" class="grow"></select>
+      <button class="pri" onclick="addClip()">+ Tambah klip</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row"><b class="grow">Timeline</b><span class="note" id="dur">0 dtk</span></div>
+    <div class="tl" id="tl"></div>
+    <div class="row">
+      <button class="pri grow" onclick="playAll()">▶ Putar semua</button>
+      <button onclick="stopAll()">■ Stop</button>
+    </div>
+    <div class="wave" id="wave" style="margin-top:8px"></div>
+    <div id="clips"></div>
+    <div class="note" id="empty">Belum ada klip. Tambahkan teks di atas.</div>
+  </div>
+</section>
+
+<section id="p2" class="hide">
+  <div class="card">
+    <b>Kloning / profil suara baru</b>
+    <label>Nama profil</label>
+    <input type="text" id="pn" placeholder="Contoh: Narator Santai">
+    <label>Suara dasar (dari perangkat)</label>
+    <select id="pv"></select>
+    <label>Kecepatan: <span id="rv">1.0</span></label>
+    <input type="range" id="pr" min="0.5" max="1.8" step="0.1" value="1" oninput="rv.textContent=this.value">
+    <label>Nada: <span id="pvv">1.0</span></label>
+    <input type="range" id="pp" min="0.5" max="1.8" step="0.1" value="1" oninput="pvv.textContent=this.value">
+    <label>Sampel audio (opsional, disimpan sebagai referensi)</label>
+    <div class="row">
+      <button id="recb" onclick="toggleRec()">● Rekam</button>
+      <input type="file" id="pf" accept="audio/*" class="grow" onchange="loadFile(this)">
+    </div>
+    <audio id="pa" controls class="hide" style="width:100%;margin-top:8px"></audio>
+    <div class="note" style="margin-top:8px">Catatan: kloning suara sungguhan butuh model AI lokal (mis. aplikasi Voicebox asli). Di browser, profil ini memakai suara bawaan perangkat dengan preset kecepatan &amp; nada, dan sampelmu disimpan sebagai referensi.</div>
+    <button class="pri" style="margin-top:10px;width:100%" onclick="saveProf()">Simpan profil</button>
+  </div>
+  <div class="card"><b>Profil tersimpan</b><div id="plist"></div></div>
+</section>
+
+<div class="credit">DIBUAT OLEH MUHAMAD EDWAR TAUFIQ HIDAYAT</div>
+
+<script>
+var clips=[],profs=[],voices=[],cur=-1,playing=false,sample=null,mr=null,chunks=[];
+var $=function(i){return document.getElementById(i)};
+function load(){try{clips=JSON.parse(localStorage.getItem('vb_clips')||'[]');profs=JSON.parse(localStorage.getItem('vb_profs')||'[]')}catch(e){}
+ if(!profs.length)profs=[{id:'def',name:'Default',voice:'',rate:1,pitch:1,sample:null}]}
+function save(){try{localStorage.setItem('vb_clips',JSON.stringify(clips));localStorage.setItem('vb_profs',JSON.stringify(profs))}catch(e){}}
+function tab(n){$('p1').classList.toggle('hide',n!=1);$('p2').classList.toggle('hide',n!=2);$('t1').className=n==1?'on':'';$('t2').className=n==2?'on':''}
+function getVoices(){voices=speechSynthesis.getVoices();
+ var h='<option value="">Suara default</option>';
+ voices.forEach(function(v){h+='<option value="'+v.name+'">'+v.name+' ('+v.lang+')</option>'});$('pv').innerHTML=h}
+function esc(s){return s.replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})}
+function pf(id){return profs.find(function(p){return p.id==id})||profs[0]}
+function est(c){return Math.max(1,c.text.length/(14*pf(c.prof).rate))}
+function render(){
+ $('prof').innerHTML=profs.map(function(p){return '<option value="'+p.id+'">'+esc(p.name)+'</option>'}).join('');
+ $('empty').classList.toggle('hide',clips.length>0);
+ var tot=0;clips.forEach(function(c){tot+=est(c)});$('dur').textContent='≈ '+Math.round(tot)+' dtk';
+ $('tl').innerHTML=clips.map(function(c,i){return '<div class="blk'+(i==cur?' act':'')+'" style="flex:'+est(c)+'" onclick="playOne('+i+')">'+(i+1)+'</div>'}).join('');
+ $('clips').innerHTML=clips.map(function(c,i){var p=pf(c.prof);
+  return '<div class="clip"><div class="tag">#'+(i+1)+' · '+esc(p.name)+'</div><p>'+esc(c.text)+'</p><div class="row">'
+  +'<button class="sm" onclick="playOne('+i+')">▶</button><button class="sm" onclick="mv('+i+',-1)">↑</button><button class="sm" onclick="mv('+i+',1)">↓</button><button class="sm" onclick="del('+i+')">Hapus</button></div></div>'}).join('');
+ $('plist').innerHTML=profs.map(function(p){return '<div class="clip row"><div class="grow"><b>'+esc(p.name)+'</b><div class="note">'+(p.voice||'default')+' · ×'+p.rate+' · nada '+p.pitch+(p.sample?' · ada sampel':'')+'</div></div>'
+  +(p.id!='def'?'<button class="sm" onclick="delProf(\''+p.id+'\')">Hapus</button>':'')+'</div>'}).join('');
+ save()}
+function addClip(){var t=$('txt').value.trim();if(!t)return;clips.push({text:t,prof:$('prof').value});$('txt').value='';render()}
+function mv(i,d){var j=i+d;if(j<0||j>=clips.length)return;var t=clips[i];clips[i]=clips[j];clips[j]=t;render()}
+function del(i){clips.splice(i,1);render()}
+function delProf(id){profs=profs.filter(function(p){return p.id!=id});render()}
+function speak(c,done){var p=pf(c.prof),u=new SpeechSynthesisUtterance(c.text);
+ var v=voices.find(function(x){return x.name==p.voice});if(v){u.voice=v;u.lang=v.lang}else u.lang='id-ID';
+ u.rate=p.rate;u.pitch=p.pitch;u.onend=done;u.onerror=done;speechSynthesis.speak(u)}
+function playOne(i){stopAll();cur=i;playing=true;anim(true);render();speak(clips[i],function(){if(cur==i){cur=-1;playing=false;anim(false);render()}})}
+function playAll(){stopAll();if(!clips.length)return;playing=true;anim(true);
+ (function next(i){if(!playing||i>=clips.length){stopAll();return}cur=i;render();speak(clips[i],function(){setTimeout(function(){next(i+1)},250)})})(0)}
+function stopAll(){playing=false;speechSynthesis.cancel();cur=-1;anim(false);render()}
+var wt;function anim(on){clearInterval(wt);var b=$('wave').children;for(var i=0;i<b.length;i++)b[i].style.height='20%';
+ if(on)wt=setInterval(function(){for(var i=0;i<b.length;i++)b[i].style.height=(15+Math.random()*85)+'%'},120)}
+function toggleRec(){
+ if(mr&&mr.state=='recording'){mr.stop();return}
+ navigator.mediaDevices.getUserMedia({audio:true}).then(function(s){chunks=[];mr=new MediaRecorder(s);
+  mr.ondataavailable=function(e){chunks.push(e.data)};
+  mr.onstop=function(){s.getTracks().forEach(function(t){t.stop()});$('recb').textContent='● Rekam';$('recb').classList.remove('rec');
+   setSample(new Blob(chunks,{type:mr.mimeType}))};
+  mr.start();$('recb').textContent='■ Stop';$('recb').classList.add('rec')}).catch(function(){alert('Mikrofon tidak bisa diakses. Coba unggah file audio.')})}
+function loadFile(el){if(el.files[0])setSample(el.files[0])}
+function setSample(b){var r=new FileReader();r.onload=function(){sample=r.result;$('pa').src=sample;$('pa').classList.remove('hide')};r.readAsDataURL(b)}
+function saveProf(){var n=$('pn').value.trim();if(!n){alert('Isi nama profil dulu.');return}
+ profs.push({id:'p'+Date.now(),name:n,voice:$('pv').value,rate:+$('pr').value,pitch:+$('pp').value,sample:sample&&sample.length<400000?sample:null});
+ $('pn').value='';sample=null;$('pa').classList.add('hide');render();tab(1)}
+(function(){var w=$('wave');for(var i=0;i<40;i++)w.appendChild(document.createElement('i'));
+ load();render();if('speechSynthesis' in window){getVoices();speechSynthesis.onvoiceschanged=getVoices}})();
+</script>
+<script>
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});}
+</script>
+</body>
+</html>
